@@ -59,7 +59,7 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 	for _, container := range pod.Spec.Containers {
 		containerReqs := container.Resources.Requests
 		cs, found := containerStatuses[container.Name]
-		if found && pod.Status.Resize != "" {
+		if found {
 			containerReqs = max(container.Resources.Requests, cs.AllocatedResources)
 		}
 
