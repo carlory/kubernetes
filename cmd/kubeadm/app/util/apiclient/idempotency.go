@@ -85,8 +85,6 @@ func CreateOrUpdate[T kubernetesObject](ctx context.Context, client kubernetesIn
 
 // CreateOrUpdateConfigMap creates a ConfigMap if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateConfigMap(client clientset.Interface, cm *v1.ConfigMap) error {
 	return CreateOrUpdate(context.Background(), client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace), cm)
 }
@@ -123,8 +121,6 @@ func CreateOrMutate[T kubernetesObject](ctx context.Context, client kubernetesIn
 // the cluster and mutator callback will be called on it, then an Update of the mutated ConfigMap will be performed. This function is resilient
 // to conflicts, and a retry will be issued if the ConfigMap was modified on the server between the refresh and the update (while the mutation was
 // taking place).
-//
-// Deprecated: use CreateOrMutate() instead.
 func CreateOrMutateConfigMap(client clientset.Interface, cm *v1.ConfigMap, mutator objectMutator[*v1.ConfigMap]) error {
 	return CreateOrMutate(context.Background(), client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace), cm, mutator)
 }
@@ -175,80 +171,60 @@ func CreateOrRetain[T kubernetesObject](ctx context.Context, client kubernetesIn
 
 // CreateOrRetainConfigMap creates a ConfigMap if the target resource doesn't exist.
 // If the resource exists already, this function will retain the resource instead.
-//
-// Deprecated: use CreateOrRetain() instead.
 func CreateOrRetainConfigMap(client clientset.Interface, cm *v1.ConfigMap, configMapName string) error {
 	return CreateOrRetain(context.Background(), client.CoreV1().ConfigMaps(cm.Namespace), cm)
 }
 
 // CreateOrUpdateSecret creates a Secret if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateSecret(client clientset.Interface, secret *v1.Secret) error {
 	return CreateOrUpdate(context.Background(), client.CoreV1().Secrets(secret.Namespace), secret)
 }
 
 // CreateOrUpdateServiceAccount creates a ServiceAccount if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAccount) error {
 	return CreateOrUpdate(context.Background(), client.CoreV1().ServiceAccounts(sa.Namespace), sa)
 }
 
 // CreateOrUpdateDeployment creates a Deployment if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deployment) error {
 	return CreateOrUpdate(context.Background(), client.AppsV1().Deployments(deploy.Namespace), deploy)
 }
 
 // CreateOrRetainDeployment creates a Deployment if the target resource doesn't exist.
 // If the resource exists already, this function will retain the resource instead.
-//
-// Deprecated: use CreateOrRetain() instead.
 func CreateOrRetainDeployment(client clientset.Interface, deploy *apps.Deployment, deployName string) error {
 	return CreateOrRetain(context.Background(), client.AppsV1().Deployments(deploy.Namespace), deploy)
 }
 
 // CreateOrUpdateDaemonSet creates a DaemonSet if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) error {
 	return CreateOrUpdate(context.Background(), client.AppsV1().DaemonSets(ds.Namespace), ds)
 }
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateRole(client clientset.Interface, role *rbac.Role) error {
 	return CreateOrUpdate(context.Background(), client.RbacV1().Roles(role.Namespace), role)
 }
 
 // CreateOrUpdateRoleBinding creates a RoleBinding if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateRoleBinding(client clientset.Interface, roleBinding *rbac.RoleBinding) error {
 	return CreateOrUpdate(context.Background(), client.RbacV1().RoleBindings(roleBinding.Namespace), roleBinding)
 }
 
 // CreateOrUpdateClusterRole creates a ClusterRole if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateClusterRole(client clientset.Interface, clusterRole *rbac.ClusterRole) error {
 	return CreateOrUpdate(context.Background(), client.RbacV1().ClusterRoles(), clusterRole)
 }
 
 // CreateOrUpdateClusterRoleBinding creates a ClusterRoleBinding if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-//
-// Deprecated: use CreateOrUpdate() instead.
 func CreateOrUpdateClusterRoleBinding(client clientset.Interface, clusterRoleBinding *rbac.ClusterRoleBinding) error {
 	return CreateOrUpdate(context.Background(), client.RbacV1().ClusterRoleBindings(), clusterRoleBinding)
 }
