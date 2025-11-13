@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -693,7 +694,7 @@ func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 		ctrl.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plugin}, nil /* prober */, ctrl)
 		ctrl.translator = fakeCSINameTranslator{}
-		ctrl.csiMigratedPluginManager = fakeCSIMigratedPluginManager{}
+		ctrl.csiTranslator = csitrans.New() // fixme
 		return toWrap(ctrl, reactor, test)
 	}
 }

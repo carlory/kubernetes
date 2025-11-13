@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -93,7 +94,8 @@ type expandController struct {
 
 	translator CSINameTranslator
 
-	csiMigratedPluginManager csimigration.PluginManager
+	// intreeToCSITranslator translates from in-tree volume specs to CSI
+	intreeToCSITranslator csimigration.InTreeToCSITranslator
 }
 
 // NewExpandController expands the pvs
@@ -102,8 +104,7 @@ func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	plugins []volume.VolumePlugin,
-	translator CSINameTranslator,
-	csiMigratedPluginManager csimigration.PluginManager) (ExpandController, error) {
+	csiTranslator csitrans.CSITranslator) (ExpandController, error) {
 
 	expc := &expandController{
 		kubeClient: kubeClient,
@@ -113,8 +114,8 @@ func NewExpandController(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "volume_expand"},
 		),
-		translator:               translator,
-		csiMigratedPluginManager: csiMigratedPluginManager,
+		translator:            csiTranslator,
+		intreeToCSITranslator: csiTranslator,
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
@@ -237,14 +238,9 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 	}
 
 	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
-	migratable, err := expc.csiMigratedPluginManager.IsMigratable(volumeSpec)
-	if err != nil {
-		logger.V(4).Info("Failed to check CSI migration status for PVC with error", "pvcKey", key, "err", err)
-		return nil
-	}
 	// handle CSI migration scenarios before invoking FindExpandablePluginBySpec for in-tree
-	if migratable {
-		inTreePluginName, err := expc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(volumeSpec.PersistentVolume, volumeSpec.Volume)
+	if expc.intreeToCSITranslator.IsMigratable(volumeSpec.PersistentVolume, volumeSpec.Volume) {
+		inTreePluginName, err := expc.intreeToCSITranslator.GetInTreePluginNameFromSpec(volumeSpec.PersistentVolume, volumeSpec.Volume)
 		if err != nil {
 			logger.V(4).Info("Error getting in-tree plugin name from persistent volume", "volumeName", volumeSpec.PersistentVolume.Name, "err", err)
 			return err
