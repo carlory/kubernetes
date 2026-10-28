@@ -165,7 +165,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.CgroupsPerQOS == nil {
 		obj.CgroupsPerQOS = ptr.To(true)
 	}
-	if !localFeatureGate.Enabled(features.DisableCgroupDriverFallback) {
+	if localFeatureGate.Enabled(features.LegacyCgroupDriverFallback) {
 		if obj.CgroupDriver == "" {
 			obj.CgroupDriver = "cgroupfs"
 		}

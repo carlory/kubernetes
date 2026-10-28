@@ -114,14 +114,14 @@ func TestKubeletDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "CgroupDriver cleared when feature gate enabled",
+			name: "CgroupDriver cleared when feature gate disabled",
 			config: kubeletconfig.KubeletConfiguration{
-				FeatureGates: map[string]bool{"DisableCgroupDriverFallback": true},
+				FeatureGates: map[string]bool{"LegacyCgroupDriverFallback": false},
 				CgroupDriver: "systemd",
 			},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
-					FeatureGates:  map[string]bool{"DisableCgroupDriverFallback": true},
+					FeatureGates:  map[string]bool{"LegacyCgroupDriverFallback": false},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},
 					Authentication: kubeletconfig.KubeletAuthentication{
@@ -145,14 +145,14 @@ func TestKubeletDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "CgroupDriver preserved when feature gate disabled",
+			name: "CgroupDriver preserved when feature gate enabled",
 			config: kubeletconfig.KubeletConfiguration{
-				FeatureGates: map[string]bool{"DisableCgroupDriverFallback": false},
+				FeatureGates: map[string]bool{"LegacyCgroupDriverFallback": true},
 				CgroupDriver: "systemd",
 			},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
-					FeatureGates:  map[string]bool{"DisableCgroupDriverFallback": false},
+					FeatureGates:  map[string]bool{"LegacyCgroupDriverFallback": true},
 					CgroupDriver:  "systemd",
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{kubeadmapiv1.DefaultClusterDNSIP},

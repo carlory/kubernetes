@@ -463,10 +463,10 @@ type KubeletConfiguration struct {
 	// or systemd).
 	//
 	// Deprecated: The kubelet obtains the cgroup driver from the container runtime.
-	// This field must be empty when the DisableCgroupDriverFallback feature gate is true (the default).
+	// This field must be empty when the LegacyCgroupDriverFallback feature gate is false (the default).
 	// This field is only used as a fallback when the runtime does not implement
-	// RuntimeConfig and the DisableCgroupDriverFallback feature gate is set to false.
-	// Default: "" when DisableCgroupDriverFallback is true; "cgroupfs" otherwise.
+	// RuntimeConfig and the LegacyCgroupDriverFallback feature gate is set to true.
+	// Default: "" when LegacyCgroupDriverFallback is false; "cgroupfs" otherwise.
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// cpuManagerPolicy is the name of the policy to use.

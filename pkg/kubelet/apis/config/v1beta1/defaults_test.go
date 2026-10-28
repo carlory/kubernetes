@@ -1121,12 +1121,12 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 			},
 		},
 		{
-			"CgroupDriver defaults cgroupfs when feature gate disabled",
+			"CgroupDriver defaults cgroupfs when feature gate enabled",
 			&v1beta1.KubeletConfiguration{
-				FeatureGates: map[string]bool{string(features.DisableCgroupDriverFallback): false},
+				FeatureGates: map[string]bool{string(features.LegacyCgroupDriverFallback): true},
 			},
 			&v1beta1.KubeletConfiguration{
-				FeatureGates:       map[string]bool{string(features.DisableCgroupDriverFallback): false},
+				FeatureGates:       map[string]bool{string(features.LegacyCgroupDriverFallback): true},
 				EnableServer:       ptr.To(true),
 				SyncFrequency:      metav1.Duration{Duration: 1 * time.Minute},
 				FileCheckFrequency: metav1.Duration{Duration: 20 * time.Second},

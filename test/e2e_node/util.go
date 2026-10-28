@@ -61,6 +61,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -94,7 +96,52 @@ var (
 	containerRuntimeUnitName = ""
 	// KubeletConfig is the kubelet configuration the test is running against.
 	kubeletCfg *kubeletconfig.KubeletConfiguration
+	// cgroupDriver is the cgroup driver the kubelet is running with. The value is
+	// obtained from the container runtime.
+	cgroupDriver = ""
 )
+
+// getCgroupDriverFromCRI returns the cgroup driver reported by the container runtime,
+// which is the driver the kubelet uses. The test fails if the runtime does not implement
+// the RuntimeConfig RPC or returns an unknown driver. An empty string is returned when
+// the runtime reports no Linux configuration, leaving the choice to the caller.
+func getCgroupDriverFromCRI(ctx context.Context) string {
+	runtimeService, _, err := getCRIClient(ctx)
+	framework.ExpectNoError(err, "failed to get the CRI client")
+
+	var runtimeConfig *runtimeapi.RuntimeConfigResponse
+	// Retry a couple of times, hoping that any errors are transient.
+	// Fail quickly on known, non transient errors.
+	for range 3 {
+		runtimeConfig, err = runtimeService.RuntimeConfig(ctx)
+		if err == nil {
+			break
+		}
+		if status.Code(err) == codes.Unimplemented {
+			framework.ExpectNoError(err, "the container runtime does not implement RuntimeConfig")
+		}
+		// The runtime may still be starting up, give it a little more time.
+		time.Sleep(2 * time.Second)
+	}
+	framework.ExpectNoError(err, "failed to get the runtime configuration")
+
+	// Calling GetLinux().GetCgroupDriver() on a response without Linux configuration
+	// does not segfault, but it always reports systemd.
+	linuxConfig := runtimeConfig.GetLinux()
+	if linuxConfig == nil {
+		return ""
+	}
+
+	switch d := linuxConfig.GetCgroupDriver(); d {
+	case runtimeapi.CgroupDriver_SYSTEMD:
+		return "systemd"
+	case runtimeapi.CgroupDriver_CGROUPFS:
+		return "cgroupfs"
+	default:
+		framework.Failf("The container runtime returned an unknown cgroup driver %d", d)
+		return ""
+	}
+}
 
 func getNodeSummary(ctx context.Context) (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig(ctx)
@@ -453,7 +500,7 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
-	if kubeletCfg.CgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
 	}
 	return cgroupName.ToCgroupfs()

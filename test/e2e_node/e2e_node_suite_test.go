@@ -338,6 +338,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 	var err error
 	kubeletCfg, err = getCurrentKubeletConfig(ctx)
 	framework.ExpectNoError(err)
+
+	cgroupDriver = getCgroupDriverFromCRI(ctx)
+	framework.Logf("cgroup driver: %s", cgroupDriver)
 })
 
 // Tear down the kubelet on the node

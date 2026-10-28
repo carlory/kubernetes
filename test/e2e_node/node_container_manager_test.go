@@ -63,7 +63,7 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, 
 	initialConfig.KubeReservedCgroup = kubeReservedCgroup
 	initialConfig.SystemReservedCgroup = systemReservedCgroup
 
-	if initialConfig.CgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		initialConfig.KubeReservedCgroup = cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup).ToSystemd()
 		initialConfig.SystemReservedCgroup = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup).ToSystemd()
 	}
@@ -92,6 +92,10 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			if !IsCgroup2UnifiedMode() {
 				ginkgo.Skip("this test requires cgroups v2")
 			}
+			// The driver comes from the container runtime, the kubelet cannot be told to use systemd.
+			if cgroupDriver != "systemd" {
+				ginkgo.Skip(fmt.Sprintf("this test requires the systemd cgroup driver (detected %q)", cgroupDriver))
+			}
 
 			var err error
 			var oldCfg *kubeletconfig.KubeletConfiguration
@@ -115,7 +119,6 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			newCfg := oldCfg.DeepCopy()
 			// Change existing kubelet configuration
 			newCfg.CPUManagerPolicy = "none"
-			newCfg.CgroupDriver = "systemd"
 			newCfg.FailCgroupV1 = true // extra safety. We want to avoid false negatives though, so we added the skip check earlier
 
 			// Update the Kubelet configuration.
@@ -234,7 +237,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	}
 
 	// Create a cgroup manager object for manipulating cgroups.
-	cgroupManager := cm.NewCgroupManager(klog.Background(), subsystems, oldCfg.CgroupDriver)
+	cgroupManager := cm.NewCgroupManager(klog.Background(), subsystems, cgroupDriver)
 
 	ginkgo.DeferCleanup(destroyTemporaryCgroupsForReservation, cgroupManager)
 	ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -309,7 +312,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 			return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
 		}
 		cgroupName := nodeAllocatableCgroup
-		if currentConfig.CgroupDriver == "systemd" {
+		if cgroupDriver == "systemd" {
 			cgroupName = nodeAllocatableCgroup + ".slice"
 		}
 
@@ -358,7 +361,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
 
 	cgroupPath := ""
-	if currentConfig.CgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		cgroupPath = cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup).ToSystemd()
 	} else {
 		cgroupPath = cgroupManager.Name(cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup))
@@ -386,7 +389,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		return err
 	}
 
-	if currentConfig.CgroupDriver == "systemd" {
+	if cgroupDriver == "systemd" {
 		cgroupPath = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup).ToSystemd()
 	} else {
 		cgroupPath = cgroupManager.Name(cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup))

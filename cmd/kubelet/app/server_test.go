@@ -20,17 +20,30 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	yaml "go.yaml.in/yaml/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	critesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -609,4 +622,134 @@ func TestMarshalKubeletConfigForLog(t *testing.T) {
 
 	// The helper must not mutate the caller's config when masking.
 	require.Equal(t, []string{"Bearer super-secret-token"}, kc.StaticPodURLHeader["Authorization"])
+}
+
+func TestGetCgroupDriverFromCRI(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		allowFallback    bool
+		configuredDriver string
+		runtimeConfig    *runtimeapi.LinuxRuntimeConfiguration
+		runtimeError     error
+		// expectedDriver is the driver returned by getCgroupDriverFromCRI.
+		expectedDriver string
+		// expectedConfiguredDriver is the driver left in the kubelet configuration.
+		expectedConfiguredDriver string
+		expectedError            string
+	}{
+		{
+			name:                     "unsupported runtime is rejected by default",
+			configuredDriver:         "systemd",
+			runtimeError:             status.Error(codes.Unimplemented, "RuntimeConfig is not implemented"),
+			expectedConfiguredDriver: "systemd",
+			expectedError:            "LegacyCgroupDriverFallback=true",
+		},
+		{
+			name:          "unsupported runtime returns the configured driver as is when fallback is enabled",
+			allowFallback: true,
+			runtimeError:  status.Error(codes.Unimplemented, "RuntimeConfig is not implemented"),
+		},
+		{
+			name:                     "unsupported runtime can fall back to systemd",
+			allowFallback:            true,
+			configuredDriver:         "systemd",
+			runtimeError:             status.Error(codes.Unimplemented, "RuntimeConfig is not implemented"),
+			expectedDriver:           "systemd",
+			expectedConfiguredDriver: "systemd",
+		},
+		{
+			name:                     "unsupported runtime can fall back to cgroupfs",
+			allowFallback:            true,
+			configuredDriver:         "cgroupfs",
+			runtimeError:             status.Error(codes.Unimplemented, "RuntimeConfig is not implemented"),
+			expectedDriver:           "cgroupfs",
+			expectedConfiguredDriver: "cgroupfs",
+		},
+		{
+			name:             "CRI systemd overrides the configured driver without touching the configuration",
+			configuredDriver: "cgroupfs",
+			runtimeConfig:    &runtimeapi.LinuxRuntimeConfiguration{CgroupDriver: runtimeapi.CgroupDriver_SYSTEMD},
+			expectedDriver:   "systemd",
+			// The configuration is only updated when the legacy fallback is enabled.
+			expectedConfiguredDriver: "cgroupfs",
+		},
+		{
+			name:                     "CRI cgroupfs overrides the configured driver even with fallback enabled",
+			allowFallback:            true,
+			configuredDriver:         "systemd",
+			runtimeConfig:            &runtimeapi.LinuxRuntimeConfiguration{CgroupDriver: runtimeapi.CgroupDriver_CGROUPFS},
+			expectedDriver:           "cgroupfs",
+			expectedConfiguredDriver: "cgroupfs",
+		},
+		{
+			name:                     "other runtime errors are not masked by fallback",
+			allowFallback:            true,
+			configuredDriver:         "systemd",
+			runtimeError:             status.Error(codes.Unavailable, "runtime unavailable"),
+			expectedConfiguredDriver: "systemd",
+			expectedError:            "runtime unavailable",
+		},
+		{
+			name:                     "unknown driver is not masked by fallback",
+			allowFallback:            true,
+			configuredDriver:         "systemd",
+			runtimeConfig:            &runtimeapi.LinuxRuntimeConfiguration{CgroupDriver: runtimeapi.CgroupDriver(100)},
+			expectedConfiguredDriver: "systemd",
+			expectedError:            "runtime returned an unknown cgroup driver 100",
+		},
+		{
+			name:                     "response without Linux config returns no driver",
+			configuredDriver:         "cgroupfs",
+			expectedConfiguredDriver: "cgroupfs",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.allowFallback {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LegacyCgroupDriverFallback, true)
+			} else {
+				require.False(t, utilfeature.DefaultFeatureGate.Enabled(features.LegacyCgroupDriverFallback))
+			}
+			runtime := critesting.NewFakeRuntimeService()
+			runtime.FakeLinuxConfiguration = tc.runtimeConfig
+			if tc.runtimeError != nil {
+				for range 3 {
+					runtime.InjectError("RuntimeConfig", tc.runtimeError)
+				}
+			}
+			server := &options.KubeletServer{
+				KubeletConfiguration: kubeletconfiginternal.KubeletConfiguration{CgroupDriver: tc.configuredDriver},
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			cgroupDriver, err := getCgroupDriverFromCRI(ctx, server, &kubelet.Dependencies{RemoteRuntimeService: runtime})
+			if err == nil && status.Code(tc.runtimeError) == codes.Unimplemented {
+				// Startup normally runs once; each fallback subtest registers the metric again.
+				t.Cleanup(func() {
+					legacyregistry.Registerer().Unregister(kubeletmetrics.CRILosingSupport)
+					kubeletmetrics.CRILosingSupport.Reset()
+				})
+			}
+			if tc.expectedError != "" {
+				require.ErrorContains(t, err, tc.expectedError)
+				if tc.runtimeError != nil {
+					require.Equal(t, status.Code(tc.runtimeError), status.Code(err))
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.expectedDriver, cgroupDriver)
+			require.Equal(t, tc.expectedConfiguredDriver, server.CgroupDriver)
+			if status.Code(tc.runtimeError) == codes.Unimplemented {
+				require.Equal(t, []string{"RuntimeConfig"}, runtime.GetCalls(), "unsupported RPCs should not be retried")
+			}
+			expectedMetrics := ""
+			if tc.allowFallback && status.Code(tc.runtimeError) == codes.Unimplemented {
+				expectedMetrics = `
+# HELP kubelet_cri_losing_support [ALPHA] the Kubernetes version that the currently running CRI implementation will lose support on if not upgraded.
+# TYPE kubelet_cri_losing_support gauge
+kubelet_cri_losing_support{version="1.38.0"} 1
+`
+			}
+			require.NoError(t, metricstestutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), kubeletmetrics.KubeletSubsystem+"_"+kubeletmetrics.CRILosingSupportKey))
+		})
+	}
 }

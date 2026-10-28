@@ -72,8 +72,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if errs := localFeatureGate.Validate(); len(errs) > 0 {
 		allErrors = append(allErrors, errs...)
 	}
-	if localFeatureGate.Enabled(features.DisableCgroupDriverFallback) && kc.CgroupDriver != "" {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cgroupDriver (--cgroup-driver) must be empty when DisableCgroupDriverFallback is enabled"))
+	if !localFeatureGate.Enabled(features.LegacyCgroupDriverFallback) && kc.CgroupDriver != "" {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: cgroupDriver (--cgroup-driver) must be empty when LegacyCgroupDriverFallback is disabled"))
 	}
 
 	if kc.NodeLeaseDurationSeconds <= 0 {

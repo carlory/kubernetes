@@ -379,14 +379,6 @@ const (
 	// The Feature Gate will be locked to true and then removed in +2 releases (1.35) if there are no bug reported
 	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
 
-	// owner: @carlory
-	// kep: https://kep.k8s.io/4033
-	//
-	// Require runtimes to implement RuntimeConfig instead of falling back to the
-	// cgroup driver in the kubelet configuration. Disable temporarily to allow
-	// the runtime to be upgraded after a kubelet upgrade.
-	DisableCgroupDriverFallback featuregate.Feature = "DisableCgroupDriverFallback"
-
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
 	//
@@ -678,6 +670,14 @@ const (
 	// Enable kubelet to send the service account token bound to the pod for which the image
 	// is being pulled to the credential provider plugin.
 	KubeletServiceAccountTokenForCredentialProviders featuregate.Feature = "KubeletServiceAccountTokenForCredentialProviders"
+
+	// owner: @carlory
+	// kep: https://kep.k8s.io/4033
+	//
+	// Allow falling back to the cgroup driver in the kubelet configuration when the
+	// runtime does not implement RuntimeConfig. Enable temporarily to allow the
+	// runtime to be upgraded after a kubelet upgrade.
+	LegacyCgroupDriverFallback featuregate.Feature = "LegacyCgroupDriverFallback"
 
 	// owner: @RobertKrawitz
 	//
@@ -1509,11 +1509,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Deprecated, LockToDefault: true}, // remove in 1.38
 	},
 
-	DisableCgroupDriverFallback: {
-		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.38"), Default: true, PreRelease: featuregate.Deprecated},
-	},
-
 	DisableNodeKubeProxyVersion: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
@@ -1734,6 +1729,11 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	KubeletServiceAccountTokenForCredentialProviders: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	LegacyCgroupDriverFallback: {
+		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {
@@ -2499,8 +2499,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 
 	DisableCPUQuotaWithExclusiveCPUs: {},
 
-	DisableCgroupDriverFallback: {},
-
 	DisableNodeKubeProxyVersion: {},
 
 	EmptyDirVolumeMode: {},
@@ -2590,6 +2588,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletSeparateDiskGC: {},
 
 	KubeletServiceAccountTokenForCredentialProviders: {},
+
+	LegacyCgroupDriverFallback: {},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {},
 

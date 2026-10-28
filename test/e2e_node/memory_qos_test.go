@@ -180,10 +180,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	var (
-		oldCfg       *kubeletconfig.KubeletConfiguration
-		cgroupDriver string
-	)
+	var oldCfg *kubeletconfig.KubeletConfiguration
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		if !IsCgroup2UnifiedMode() {
@@ -193,7 +190,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 		var err error
 		oldCfg, err = getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
-		cgroupDriver = oldCfg.CgroupDriver
 	})
 
 	// configureMemoryQoS restarts kubelet with MemoryQoS enabled and specified settings.

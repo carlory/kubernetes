@@ -1,6 +1,5 @@
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
-cgroupDriver: cgroupfs
 cgroupRoot: /
 
 # Assign a fixed CIDR to the node because we do not run a node controller
